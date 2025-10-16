@@ -1,0 +1,5 @@
+[
+  { "name": "Sample Diner", "address": "123 Main St", "category": "korean", "rating": 4.5 },
+  { "name": "Tasty Corner", "address": "45 Side Rd", "category": "fusion", "rating": 4.2 }
+]
+
