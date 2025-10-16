@@ -1,22 +1,69 @@
+﻿const restaurantService = require('../services/restaurants.service');
 const asyncHandler = require('../utils/asyncHandler');
 
-exports.getAll = asyncHandler(async (req, res) => {
-  res.json({ message: 'get restaurants (stub)' });
+const normaliseMenu = (menu) => {
+  if (!menu) return [];
+  if (Array.isArray(menu)) return menu;
+  if (typeof menu === 'string') {
+    return menu
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+  return [];
+};
+
+exports.getRestaurants = asyncHandler(async (req, res) => {
+  const restaurants = await restaurantService.getAllRestaurants();
+  res.json({ data: restaurants });
 });
 
-exports.create = asyncHandler(async (req, res) => {
-  res.status(201).json({ message: 'create restaurant (stub)' });
+exports.getPopularRestaurants = asyncHandler(async (req, res) => {
+  const limit = Number(req.query.limit) || 5;
+  const restaurants = await restaurantService.getPopularRestaurants(limit);
+  res.json({ data: restaurants });
 });
 
-exports.getById = asyncHandler(async (req, res) => {
-  res.json({ message: 'get restaurant by id (stub)' });
+exports.getRestaurant = asyncHandler(async (req, res) => {
+  const restaurant = await restaurantService.getRestaurantById(req.params.id);
+
+  if (!restaurant) {
+    res.status(404).json({ error: { message: 'Restaurant not found' } });
+    return;
+  }
+
+  res.json({ data: restaurant });
 });
 
-exports.update = asyncHandler(async (req, res) => {
-  res.json({ message: 'update restaurant (stub)' });
+exports.createRestaurant = asyncHandler(async (req, res) => {
+  const payload = {
+    ...req.body,
+    recommendedMenu: normaliseMenu(req.body?.recommendedMenu)
+  };
+
+  const restaurant = await restaurantService.createRestaurant(payload);
+  res.status(201).json({ data: restaurant });
 });
 
-exports.remove = asyncHandler(async (req, res) => {
-  res.status(204).end();
+exports.updateRestaurant = asyncHandler(async (req, res) => {
+  const payload = {
+    ...req.body,
+    recommendedMenu: normaliseMenu(req.body?.recommendedMenu)
+  };
+
+  const updated = await restaurantService.updateRestaurant(req.params.id, payload);
+  if (!updated) {
+    res.status(404).json({ error: { message: 'Restaurant not found' } });
+    return;
+  }
+  res.json({ data: updated });
 });
 
+exports.deleteRestaurant = asyncHandler(async (req, res) => {
+  const deleted = await restaurantService.deleteRestaurant(req.params.id);
+  if (!deleted) {
+    res.status(404).json({ error: { message: 'Restaurant not found' } });
+    return;
+  }
+  res.status(204).send();
+});

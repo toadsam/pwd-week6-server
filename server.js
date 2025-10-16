@@ -1,25 +1,37 @@
-require('dotenv').config();
-const http = require('http');
-const app = require('./src/app');
-const { connectDB } = require('./src/config/db');
+﻿require('dotenv').config();
+const { connectDB, closeDB } = require('./src/config/db');
+const createApp = require('./src/app');
+const { ensureSeededOnce } = require('./src/services/restaurants.service');
 
 const PORT = process.env.PORT || 3000;
 
-(async () => {
+const app = createApp();
+
+async function start() {
   try {
-    if (process.env.MONGO_URI) {
-      await connectDB(process.env.MONGO_URI);
-      console.log('MongoDB connected');
-    } else {
-      console.log('MONGO_URI not set. Skipping DB connection.');
+    await connectDB(process.env.MONGODB_URI, process.env.DB_NAME);
+    await ensureSeededOnce();
+    if (require.main === module) {
+      app.listen(PORT, () => console.log(`Server listening on port ${PORT}`));
     }
   } catch (err) {
-    console.error('DB connection error:', err.message);
+    console.error('Failed to start server:', err);
+    process.exit(1);
   }
+}
 
-  const server = http.createServer(app);
-  server.listen(PORT, () => {
-    console.log(`Server listening on port ${PORT}`);
-  });
-})();
+start();
 
+// graceful shutdown
+process.on('SIGINT', async () => {
+  console.log('Received SIGINT, shutting down...');
+  await closeDB();
+  process.exit(0);
+});
+process.on('SIGTERM', async () => {
+  console.log('Received SIGTERM, shutting down...');
+  await closeDB();
+  process.exit(0);
+});
+
+module.exports = app;

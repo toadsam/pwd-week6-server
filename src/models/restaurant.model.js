@@ -1,14 +1,35 @@
-const { Schema, model } = require('mongoose');
+// src/models/restaurant.model.js
+const mongoose = require('mongoose');
 
-const restaurantSchema = new Schema(
+const RestaurantSchema = new mongoose.Schema(
   {
-    name: { type: String, required: true },
-    address: { type: String },
-    category: { type: String },
+    id: { type: Number, required: true, unique: true, index: true },
+    name: { type: String, required: true, index: true },
+    category: { type: String, required: true, index: true },
+    location: { type: String, required: true },
+    priceRange: { type: String, default: '정보 없음' },
     rating: { type: Number, default: 0 },
+    description: { type: String, default: '' },
+    recommendedMenu: { type: [String], default: [] },
+    likes: { type: Number, default: 0 },
+    image: { type: String, default: '' }
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+    versionKey: false,
+    toObject: {
+      transform: (_doc, ret) => {
+        delete ret._id;
+        return ret;
+      }
+    },
+    toJSON: {
+      transform: (_doc, ret) => {
+        delete ret._id;
+        return ret;
+      }
+    }
+  }
 );
 
-module.exports = model('Restaurant', restaurantSchema);
-
+module.exports = mongoose.models.Restaurant || mongoose.model('Restaurant', RestaurantSchema);

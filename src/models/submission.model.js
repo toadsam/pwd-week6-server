@@ -1,14 +1,35 @@
-const { Schema, model, Types } = require('mongoose');
+// src/models/submission.model.js
+const mongoose = require('mongoose');
 
-const submissionSchema = new Schema(
+const SubmissionSchema = new mongoose.Schema(
   {
-    user: { type: Types.ObjectId, ref: 'User' },
-    name: { type: String, required: true },
-    address: { type: String },
-    status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },
+    id: { type: Number, required: true, unique: true, index: true },
+    restaurantName: { type: String, required: true, index: true },
+    category: { type: String, required: true, index: true },
+    location: { type: String, required: true },
+    priceRange: { type: String, default: '' },
+    recommendedMenu: { type: [String], default: [] },
+    review: { type: String, default: '' },
+    submitterName: { type: String, default: '' },
+    submitterEmail: { type: String, default: '' },
+    status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending', index: true }
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+    versionKey: false,
+    toObject: {
+      transform: (_doc, ret) => {
+        delete ret._id;
+        return ret;
+      }
+    },
+    toJSON: {
+      transform: (_doc, ret) => {
+        delete ret._id;
+        return ret;
+      }
+    }
+  }
 );
 
-module.exports = model('Submission', submissionSchema);
-
+module.exports = mongoose.models.Submission || mongoose.model('Submission', SubmissionSchema);
