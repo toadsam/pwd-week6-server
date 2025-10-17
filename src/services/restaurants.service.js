@@ -1,105 +1,95 @@
-﻿const path = require('path');
+const path = require('path');
 const { readFileSync } = require('fs');
-const Restaurant = require('../models/restaurant.model');
 
 const DATA_PATH = path.join(__dirname, '..', 'data', 'restaurants.json');
 
-function readSeedDataSync() {
-  const raw = readFileSync(DATA_PATH, 'utf8');
-  return JSON.parse(raw);
+let store = [];
+let nextId = 1;
+
+function deepClone(obj) {
+  return JSON.parse(JSON.stringify(obj));
 }
 
-async function getNextRestaurantId() {
-  const max = await Restaurant.findOne().sort('-id').select('id').lean();
-  return (max?.id || 0) + 1;
-}
-
-function getAllRestaurantsSync() {
-  // 동기 데모 전용: 파일에서 즉시 반환
-  const data = readSeedDataSync();
-  return JSON.parse(JSON.stringify(data));
-}
-
-async function getAllRestaurants() {
-  const docs = await Restaurant.find({}).lean();
-  return docs;
-}
-
-async function getRestaurantById(id) {
-  const numericId = Number(id);
-  const doc = await Restaurant.findOne({ id: numericId }).lean();
-  return doc || null;
-}
-
-async function getPopularRestaurants(limit = 5) {
-  const docs = await Restaurant.find({}).sort({ rating: -1 }).limit(limit).lean();
-  return docs;
-}
-
-async function createRestaurant(payload) {
-  const requiredFields = ['name', 'category', 'location'];
-  const missingField = requiredFields.find((field) => !payload[field]);
-  if (missingField) {
-    const error = new Error(`'${missingField}' is required`);
-    error.statusCode = 400;
-    throw error;
+function loadSeed() {
+  try {
+    const raw = readFileSync(DATA_PATH, 'utf8');
+    const json = JSON.parse(raw);
+    return Array.isArray(json) ? json : [];
+  } catch (e) {
+    return [];
   }
-
-  const nextId = await getNextRestaurantId();
-  const doc = await Restaurant.create({
-    id: nextId,
-    name: payload.name,
-    category: payload.category,
-    location: payload.location,
-    priceRange: payload.priceRange ?? '정보 없음',
-    rating: payload.rating ?? 0,
-    description: payload.description ?? '',
-    recommendedMenu: Array.isArray(payload.recommendedMenu) ? payload.recommendedMenu : [],
-    likes: 0,
-    image: payload.image ?? ''
-  });
-  return doc.toObject();
 }
 
 async function resetStore() {
-  const seed = readSeedDataSync();
-  await Restaurant.deleteMany({});
-  await Restaurant.insertMany(seed);
+  const seed = loadSeed();
+  store = seed.map((item, idx) => ({
+    id: item.id ?? idx + 1,
+    name: item.name,
+    category: item.category || item.type || '기타',
+    location: item.location || item.address || '',
+    rating: typeof item.rating === 'number' ? item.rating : 0,
+  }));
+  nextId = store.reduce((m, it) => Math.max(m, Number(it.id) || 0), 0) + 1;
 }
 
-async function ensureSeededOnce() {
-  const count = await Restaurant.estimatedDocumentCount();
-  if (count > 0) return { seeded: false, count };
-  const seed = readSeedDataSync();
-  await Restaurant.insertMany(seed);
-  return { seeded: true, count: seed.length };
+function getAllRestaurantsSync() {
+  return deepClone(store);
+}
+
+async function getAllRestaurants() {
+  return getAllRestaurantsSync();
+}
+
+async function getRestaurantById(id) {
+  const targetId = Number(id);
+  const found = store.find((it) => Number(it.id) === targetId) || null;
+  return deepClone(found);
+}
+
+async function getPopularRestaurants(limit = 5) {
+  const sorted = [...store].sort((a, b) => (b.rating || 0) - (a.rating || 0));
+  return deepClone(sorted.slice(0, limit));
+}
+
+async function createRestaurant(payload) {
+  const required = ['name', 'category', 'location'];
+  const missing = required.find((k) => !payload || !payload[k]);
+  if (missing) {
+    const err = new Error(`'${missing}' is required`);
+    err.status = 400;
+    throw err;
+  }
+
+  const created = {
+    id: nextId++,
+    name: payload.name,
+    category: payload.category,
+    location: payload.location,
+    rating: typeof payload.rating === 'number' ? payload.rating : 0,
+  };
+  store.push(created);
+  return deepClone(created);
 }
 
 async function updateRestaurant(id, payload) {
-  const numericId = Number(id);
-  const updated = await Restaurant.findOneAndUpdate(
-    { id: numericId },
-    {
-      $set: {
-        name: payload.name,
-        category: payload.category,
-        location: payload.location,
-        priceRange: payload.priceRange,
-        rating: payload.rating,
-        description: payload.description,
-        recommendedMenu: Array.isArray(payload.recommendedMenu) ? payload.recommendedMenu : undefined,
-        image: payload.image,
-      }
-    },
-    { new: true, runValidators: true, lean: true }
-  );
-  return updated;
+  const targetId = Number(id);
+  const idx = store.findIndex((it) => Number(it.id) === targetId);
+  if (idx === -1) return null;
+  store[idx] = { ...store[idx], ...payload, id: targetId };
+  return deepClone(store[idx]);
 }
 
 async function deleteRestaurant(id) {
-  const numericId = Number(id);
-  const deleted = await Restaurant.findOneAndDelete({ id: numericId }).lean();
-  return deleted;
+  const targetId = Number(id);
+  const idx = store.findIndex((it) => Number(it.id) === targetId);
+  if (idx === -1) return null;
+  const [removed] = store.splice(idx, 1);
+  return deepClone(removed);
+}
+
+async function ensureSeededOnce() {
+  if (store.length === 0) await resetStore();
+  return { seeded: true, count: store.length };
 }
 
 module.exports = {
