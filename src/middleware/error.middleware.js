@@ -10,7 +10,6 @@ module.exports = function errorHandler(err, req, res, next) {
     payload.error.stack = err.stack;
   }
 
-  console.error('Error:', err.message);
+  console.error('Error:', err.message || err);
   res.status(status).json(payload);
 };
-
