@@ -10,6 +10,7 @@ const usersRouter = require('./routes/users.routes');
 const notFound = require('./middleware/notFound.middleware');
 const errorHandler = require('./middleware/error.middleware');
 const mongoose = require('mongoose');
+const path = require('path');
 const getCorsConfig = require('../cors-config');
 
 function createApp() {
@@ -19,9 +20,21 @@ function createApp() {
   app.set('trust proxy', 1);
 
   // CORS 설정 - 로컬 개발 및 배포 환경 대응
-  app.use(cors(getCorsConfig()));
+  const corsMiddleware = cors(getCorsConfig());
+  app.use(corsMiddleware);
+  // Express 5: 와일드카드 경로 미지원 → 메소드 기반 OPTIONS 핸들러
+  app.use((req, res, next) => {
+    if (req.method === 'OPTIONS') {
+      return corsMiddleware(req, res, () => res.sendStatus(204));
+    }
+    next();
+  });
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
+  // 동일 오리진으로 테스트 페이지 제공
+  app.get('/test.html', (req, res) => {
+    res.sendFile(path.join(__dirname, '..', 'test.html'));
+  });
 
   // 세션 설정
   const sessionConfig = {
